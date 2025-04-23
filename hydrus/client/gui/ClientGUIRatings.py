@@ -12,7 +12,7 @@ from hydrus.client import ClientGlobals as CG
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui import ClientGUIFunctions
 from hydrus.client.gui.widgets import ClientGUICommon
-from hydrus.client.gui.widgets import ClientGUIPainterShapes as RatingShapes
+from hydrus.client.gui.widgets import ClientGUIPainterShapes
 from hydrus.client.metadata import ClientRatings
 
 default_like_colours = {}
@@ -95,7 +95,7 @@ def DrawLike( painter: QG.QPainter, x, y, service_key, rating_state ):
     painter.setPen( QG.QPen( pen_colour ) )
     painter.setBrush( QG.QBrush( brush_colour ) )
     
-    RatingShapes.DrawShape( painter, shape, x, y )
+    ClientGUIPainterShapes.DrawShape( painter, shape, x, y )
     
 
 def DrawNumerical( painter: QG.QPainter, x, y, service_key, rating_state, rating ):
@@ -105,7 +105,7 @@ def DrawNumerical( painter: QG.QPainter, x, y, service_key, rating_state, rating
     ( shape, stars ) = GetStars( service_key, rating_state, rating )
     
     x_delta = 0
-    x_step = RatingShapes.SIZE.width()
+    x_step = ClientGUIPainterShapes.SIZE.width()
     
     for ( num_stars, pen_colour, brush_colour ) in stars:
         
@@ -114,7 +114,7 @@ def DrawNumerical( painter: QG.QPainter, x, y, service_key, rating_state, rating
         
         for i in range( num_stars ):
             
-            RatingShapes.DrawShape( painter, shape, x + x_delta, y )
+            ClientGUIPainterShapes.DrawShape( painter, shape, x + x_delta, y )
             
             x_delta += x_step
             
