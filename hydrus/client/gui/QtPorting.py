@@ -797,6 +797,435 @@ class TabWidgetWithDnD( QW.QTabWidget ):
         self.pageDragAndDropped.emit( source_page, source_tab_bar )
         
     
+
+# Base tree view that uses a PagesNotebookTreeModel( QC.QAbstractItemModel ) to allow more control over pages/notebooks
+class TreeViewWithDnD( QW.QTreeView ):
+    
+    leafDragAndDropped = QC.Signal( QW.QWidget, QW.QWidget )
+    
+    def __init__( self, parent = None ):
+        
+        super().__init__( parent )
+        
+        self.setHeaderHidden( True )
+        
+        self.setContextMenuPolicy( QC.Qt.ContextMenuPolicy.CustomContextMenu )
+        
+        self.customContextMenuRequested.connect( self._ShowContextMenu )
+        
+        self.activated.connect( self._OnTreeActivated )
+        self.doubleClicked.connect( self._OnTreeActivated )
+        
+    
+    def _ShowContextMenu( self, point ):
+        
+        index = self.indexAt( point )
+        
+        if not index.isValid():
+            return
+            
+        
+        model = self.model()
+        
+        kind = model.GetKindFromIndex( index )
+        
+        if kind not in ( 'page', 'notebook' ):
+            return
+            
+        
+        page_key = model.GetPageKeyFromIndex( index )
+        notebook = model.GetParentNotebookFromIndex( index )
+        
+        menu = QW.QMenu( self )
+        
+        menu.addAction( 'activate', lambda: self._ActivatePage( page_key ) )
+        menu.addAction( 'rename', lambda: self._RenamePage( notebook, index ) )
+        menu.addAction( 'duplicate', lambda: self._DuplicatePage( notebook, index ) )
+        
+        menu.addSeparator()
+        
+        if kind == 'notebook':
+            
+            num_pages = f' ({notebook.GetNumPagesHeld( only_my_level = False )}p)'
+            menu.addAction( 'refresh all child pages', lambda: self._RefreshAllPages( notebook ) )
+            
+        elif kind == 'page':
+            
+            num_pages = ''
+            menu.addAction( 'refresh this page', lambda: self._RefreshPage( notebook, page_key ) )
+            
+        
+        menu.addSeparator()
+        
+        menu.addAction( 'new page here', lambda: self._CreateNewPage( notebook, index ) )
+        menu.addAction( f'close{num_pages}', lambda: self._ClosePage( notebook, index ) )
+        
+        menu.exec_( self.viewport().mapToGlobal( point ) )
+        
+    
+    def _ActivatePage( self, page_key ):
+        
+        CG.client_controller.gui.ShowPage( page_key )
+        
+    def _RenamePage( self, notebook, index ):
+        
+        notebook.RenamePage( index.row() )
+        
+    def _DuplicatePage( self, notebook, index ):
+        
+        notebook.DuplicatePage( index.row() )
+        
+    def _RefreshAllPages( self, notebook ):
+        
+        notebook.RefreshAllPages()
+        
+    def _RefreshPage( self, notebook, page_key ):
+        
+        page = notebook.GetPageFromPageKey( page_key )
+        
+        if page is not None:
+            
+            page.RefreshQuery()
+            
+        
+    def _CreateNewPage( self, notebook, index ):
+        
+        notebook.ChooseNewPage( index.row() )
+        
+    def _ClosePage( self, notebook, index):
+        
+        notebook.ClosePage( index.row() )
+        
+    
+    def _GetExpandedPageKeys( self ):
+        
+        model = self.model()
+        
+        expanded = set()
+        
+        def walk( parent = QC.QModelIndex() ):
+            
+            rows = model.rowCount( parent )
+            
+            for row in range( rows ):
+                
+                index = model.index( row, 0, parent )
+                
+                if not index.isValid():
+                    continue
+                
+                if self.isExpanded( index ):
+                    
+                    page_key = model.GetPageKeyFromIndex( index )
+                    
+                    if page_key is not None:
+                        expanded.add( page_key )
+                    
+                    walk( index )
+                
+            
+        walk()
+        
+        return expanded
+        
+    
+    def _OnTreeActivated( self, index: QC.QModelIndex ):
+        
+        model = self.model()
+        
+        if model is None:
+            return
+        
+        page_key = model.GetPageKeyFromIndex( index )
+        
+        if page_key is not None:
+            
+            CG.client_controller.gui.ShowPage( page_key )
+            
+        
+    
+    def _RestoreExpandedPageKeys( self, expanded_keys ):
+        
+        model = self.model()
+        
+        def walk( parent = QC.QModelIndex() ):
+            
+            rows = model.rowCount( parent )
+            
+            for row in range( rows ):
+                
+                index = model.index( row, 0, parent )
+                
+                if not index.isValid():
+                    continue
+                
+                page_key = model.GetPageKeyFromIndex( index )
+                
+                if page_key in expanded_keys:
+                    self.expand( index )
+                
+                walk( index )
+                
+            
+        walk()
+        
+    
+
+class TreeViewWithControls( QW.QWidget ):
+    
+    widgetAlignmentChanged = QC.Signal()
+    
+    def __init__( self, tree: QW.QTreeView, parent = None, on_toggle_alignment = None ):
+        
+        super().__init__( parent )
+        
+        self._on_toggle_alignment = on_toggle_alignment
+        
+        self._tree = tree
+        
+        self._controls_at_top = CG.client_controller.new_options.GetBoolean( 'tab_tree_view_controls_at_top' )
+        self._panel_at_top = CG.client_controller.new_options.GetBoolean( 'tab_tree_view_expanding_panel_at_top' )
+        
+        #
+        
+        from hydrus.client.gui.widgets import ClientGUICommon
+        
+        self._controls = QW.QWidget( self )
+        self._controls_layout = QW.QHBoxLayout( self._controls )
+        self._controls_layout.setContentsMargins( 0, 0, 0, 0 ) 
+        self._controls_layout.setSpacing( 2 )
+        
+        
+        depth_1 = ClientGUICommon.IconButton( self, CC.global_icons().bold, lambda: self.expandToDepth( 1 ) )
+        depth_1.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to depth 1' ) )
+        
+        depth_2 = ClientGUICommon.IconButton( self, CC.global_icons().italic, lambda: self.expandToDepth( 2 ) )
+        depth_2.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to depth 2' ) )
+        
+        depth_3 = ClientGUICommon.IconButton( self, CC.global_icons().underline, lambda: self.expandToDepth( 3 ) )
+        depth_3.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to depth 3' ) )
+        
+        depth_increment = ClientGUICommon.IconButton( self, CC.global_icons().zoom_in, lambda: self.expandToDepth( self._tree.depth() + 1 ) )
+        depth_increment.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to next depth' ) )
+        
+        depth_decrement = ClientGUICommon.IconButton( self, CC.global_icons().zoom_out, lambda: self.expandToDepth( max( 0, self._tree.depth() - 1 ) ) )
+        depth_decrement.setToolTip( ClientGUIFunctions.WrapToolTip( 'Collapse to previous depth' ) )
+        
+        collapse_all = ClientGUICommon.IconButton( self, CC.global_icons().position_first, self._tree.collapseAll )
+        collapse_all.setToolTip( ClientGUIFunctions.WrapToolTip( 'Collapse all' ) )
+        
+        expand_all = ClientGUICommon.IconButton( self, CC.global_icons().position_last, lambda: self.expandToDepth( 1000 ) )
+        expand_all.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand all' ) )
+        
+        self._controls_button = ClientGUICommon.IconButton( self, CC.global_icons().cog, self._ShowCogMenu )
+        self._controls_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Tree view controls' ) )
+        
+        #
+        self.placeholder_long_text = str( CG.client_controller.GetThreadsSnapshot() )
+        if CG.client_controller.gui is not None:
+            self.placeholder_long_text = str( CG.client_controller.gui.GetTotalPageCounts() ) + str( CG.client_controller.gui.GetPagesHistory() ) + self.placeholder_long_text
+        
+        self._expanding_panel = ClientGUICommon.BetterStaticText( self, f'blah blah blah {self.placeholder_long_text}' )
+        self._expanding_panel.setWordWrap( True )
+        self._expanding_panel._wrap_width = 200
+        
+        scroll_area = QW.QScrollArea()
+        scroll_area.setWidget( self._expanding_panel )
+        scroll_area.setWidgetResizable( True )
+        self._expanding_panel = scroll_area
+        
+        self._expanding_panel_splitter = QW.QSplitter( QC.Qt.Orientation.Vertical )
+        
+        if self._panel_at_top:
+            self._expanding_panel_splitter.addWidget( self._expanding_panel )
+            self._expanding_panel_splitter.addWidget( self._tree )
+            
+        else:
+            self._expanding_panel_splitter.addWidget( self._tree )
+            self._expanding_panel_splitter.addWidget( self._expanding_panel )
+        
+        self._expanding_panel_splitter.setSizes( CG.client_controller.new_options.GetIntegerList( 'tab_tree_view_expanding_panel_splitter_size' ) )
+        self._expanding_panel_splitter.splitterMoved.connect( self._SplitterSizeChanged )
+        
+        #
+        
+        self._controls_layout.addWidget( depth_1 )
+        self._controls_layout.addWidget( depth_2 )
+        self._controls_layout.addWidget( depth_3 )
+        self._controls_layout.addWidget( depth_increment )
+        self._controls_layout.addWidget( depth_decrement )
+        self._controls_layout.addWidget( collapse_all )
+        self._controls_layout.addWidget( expand_all )
+        
+        self._controls_layout.addStretch( 1 )
+        
+        self._controls_layout.addWidget( self._controls_button )
+        
+        #
+        
+        self._vbox = QW.QVBoxLayout( self )
+        self._vbox.setContentsMargins( 0, 0, 0, 0 )
+        self._vbox.setSpacing( 2 )
+        
+        if self._controls_at_top:
+            
+            self._vbox.addWidget( self._controls )
+            self._vbox.addWidget( self._expanding_panel_splitter )
+            
+        else:
+            
+            self._vbox.addWidget( self._expanding_panel_splitter )
+            self._vbox.addWidget( self._controls )
+            
+    
+    def GetTreeView( self ) -> QW.QTreeView:
+        
+        return self._tree
+        
+    
+    def GetControlWidget( self ) -> QW.QWidget:
+        
+        return self._controls
+        
+    
+    def _SplitterSizeChanged( self ):
+        
+        sizes = self._expanding_panel_splitter.sizes()
+        
+        CG.client_controller.new_options.SetIntegerList( 'tab_tree_view_expanding_panel_splitter_size', sizes )
+        
+    
+    def _MoveControlBarUp( self ):
+        
+        if self._controls_at_top:
+            return
+            
+        self._vbox.removeWidget( self._controls )
+        self._vbox.insertWidget( 0, self._controls )
+        
+        self._controls_at_top = True
+        CG.client_controller.new_options.SetBoolean( 'tab_tree_view_controls_at_top', True )
+        
+    
+    def _MoveControlBarDown( self ):
+        
+        if not self._controls_at_top:
+            return
+            
+        self._vbox.removeWidget( self._controls )
+        self._vbox.addWidget( self._controls )
+        
+        self._controls_at_top = False
+        CG.client_controller.new_options.SetBoolean( 'tab_tree_view_controls_at_top', False )
+        
+    
+    def _MoveExpandingPanelToTop( self ):
+        
+        if self._panel_at_top:
+            
+            return
+            
+        
+        self._expanding_panel_splitter.widget(0).deleteLater()
+        self._expanding_panel_splitter.insertWidget( 0, self._expanding_panel )
+        
+        self._panel_at_top = True
+        CG.client_controller.new_options.SetBoolean( 'tab_tree_view_expanding_panel_at_top', True )
+        
+    
+    def _MoveExpandingPanelToBottom( self ):
+        
+        if not self._panel_at_top:
+            
+            return
+            
+        
+        self._expanding_panel_splitter.widget(0).deleteLater()
+        self._expanding_panel_splitter.addWidget( self._expanding_panel )
+        
+        self._panel_at_top = False
+        CG.client_controller.new_options.SetBoolean( 'tab_tree_view_expanding_panel_at_top', False )
+        
+    
+    def _EmitAlignmentToggle( self, direction: int ):
+        
+        CG.client_controller.new_options.SetNoneableInteger( 'tab_tree_view_alignment', direction )
+        
+        self.widgetAlignmentChanged.emit()
+        
+        if self._on_toggle_alignment is not None:
+            
+            self._on_toggle_alignment( direction )
+            
+        
+    
+    def _ShowCogMenu( self ):
+        
+        if CG.client_controller.gui is not None:
+            self.placeholder_long_text = str( CG.client_controller.gui.GetTotalPageCounts() ) + str( CG.client_controller.gui.GetPagesHistory() ) + self.placeholder_long_text
+            self._expanding_panel.widget().setText( f'blah blah blah {self.placeholder_long_text}' )
+                
+            
+        
+        from hydrus.client.gui import ClientGUIMenus
+        
+        menu = ClientGUIMenus.GenerateMenu( self )
+        
+        if self._controls_at_top:
+            
+            menu.addAction( 'Move control bar down', self._MoveControlBarDown )
+            
+        else:
+            
+            menu.addAction( 'Move control bar up', self._MoveControlBarUp )
+            
+        if self._panel_at_top:
+            
+            menu.addAction( 'Move expanding panel to bottom', self._MoveExpandingPanelToBottom )
+            menu.addAction( 'Move expanding panel to top', self._MoveExpandingPanelToTop )
+            
+        else:
+            
+            menu.addAction( 'Move expanding panel to top', self._MoveExpandingPanelToTop )
+            menu.addAction( 'Move expanding panel to bottom', self._MoveExpandingPanelToBottom )
+            
+        
+        menu.addSeparator()
+        
+        if CG.client_controller.new_options.GetNoneableInteger( 'tab_tree_view_alignment' ) == CC.DIRECTION_LEFT:
+            
+            menu.addAction( 'Align tree to right', lambda: self._EmitAlignmentToggle( CC.DIRECTION_RIGHT ) )
+            
+        else:
+            
+            menu.addAction( 'Align tree to left', lambda: self._EmitAlignmentToggle( CC.DIRECTION_LEFT ) )
+            
+        
+        if CG.client_controller.new_options.GetBoolean( 'tab_tree_view_hides_tabs' ):
+            
+            menu.addAction( 'Show the normal tab bar', lambda: self._ToggleTabBarVisibility() )
+            
+        else:
+            
+            menu.addAction( 'Hide the normal tab bar', lambda: self._ToggleTabBarVisibility() )
+            
+        
+        menu.exec_( QG.QCursor.pos() )
+        
+    
+    def _ToggleTabBarVisibility( self ):
+        
+        CG.client_controller.new_options.FlipBoolean( 'tab_tree_view_hides_tabs' )
+        
+        CG.client_controller.gui.GetTopLevelNotebook().tabBar().setVisible( not CG.client_controller.new_options.GetBoolean( 'tab_tree_view_hides_tabs' ) )
+        
+    
+    def expandToDepth( self, depth ):
+        
+        self._tree.expandToDepth( depth )
+        
+    
+
 def DeleteAllNotebookPages( notebook ):
     
     while notebook.count() > 0:
