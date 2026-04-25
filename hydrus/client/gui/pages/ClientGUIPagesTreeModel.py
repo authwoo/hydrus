@@ -342,18 +342,123 @@ class PagesNotebookTreeModel( QC.QAbstractItemModel ):
         return None
         
     
-    def flags( self, index: QC.QModelIndex ) -> QC.Qt.ItemFlag:
+    def flags( self, index ):
         
-        data = self._IndexData( index )
-        
-        if data is None:
-            return QC.Qt.ItemFlag.NoItemFlags
-        
+        if not index.isValid():
+            
+            return QC.Qt.ItemFlag.ItemIsEnabled | QC.Qt.ItemFlag.ItemIsDropEnabled
+            
         return (
             QC.Qt.ItemFlag.ItemIsEnabled |
             QC.Qt.ItemFlag.ItemIsSelectable |
-            QC.Qt.ItemFlag.ItemIsDragEnabled
+            QC.Qt.ItemFlag.ItemIsDragEnabled |
+            QC.Qt.ItemFlag.ItemIsDropEnabled
         )
+        
+    
+    def supportedDropActions( self ):
+        
+        return QC.Qt.DropAction.MoveAction
+        
+    
+    def supportedDragActions( self ):
+        
+        return QC.Qt.DropAction.MoveAction
+        
+    
+    def mimeTypes( self ):
+        
+        return [ 'application/x-hydrus-page-tree-index' ]
+        
+    
+    def mimeData( self, indexes ):
+        
+        mime_data = QC.QMimeData()
+        
+        index = indexes[0]
+        data = self._IndexData( index )
+        
+        if data is not None:
+            
+            mime_data.setData( 'application/x-hydrus-page-tree-index', str( id( data.obj ) ).encode( 'ascii' ) )
+            
+        
+        return mime_data
+        
+    
+    def dropMimeData( self, mime_data, action, row, column, parent ):
+        
+        if action != QC.Qt.DropAction.MoveAction:
+            
+            return False
+            
+        
+        if not mime_data.hasFormat( 'application/x-hydrus-page-tree-index' ):
+            
+            return False
+            
+        
+        dragged_obj_id = int(
+            bytes( mime_data.data( 'application/x-hydrus-page-tree-index' ) ).decode( 'ascii' )
+        )
+        
+        dragged_data = None
+        
+        for data in self._index_data_store:
+            
+            if id( data.obj ) == dragged_obj_id:
+                
+                dragged_data = data
+                break
+                
+            
+        
+        if dragged_data is None or dragged_data.parent is None:
+            
+            return False
+            
+        
+        source_notebook = dragged_data.parent.obj
+        page = dragged_data.obj
+        
+        source_index = source_notebook.indexOf( page )
+        
+        if source_index == -1:
+            
+            return False
+            
+        
+        target_data = self._IndexDataOrRoot( parent )
+        
+        if target_data.kind in ( 'root', 'notebook' ):
+            
+            target_notebook = target_data.obj
+            
+        else:
+            
+            target_notebook = target_data.parent.obj
+            
+        
+        if row == -1:
+            
+            row = target_notebook.count()
+            
+        
+        icon = source_notebook.tabIcon( source_index )
+        text = source_notebook.tabText( source_index )
+        
+        source_notebook.removeTab( source_index )
+        
+        if source_notebook is target_notebook and row > source_index:
+            
+            row -= 1
+            
+        
+        target_notebook.insertTab( row, page, icon, text )
+        
+        self.Reset()
+        
+        return True
         
     
     def _FindNotebookIndex( self, target_notebook: ClientGUIPages.PagesNotebook, parent: QC.QModelIndex = QC.QModelIndex() ) -> QC.QModelIndex:

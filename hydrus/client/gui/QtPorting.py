@@ -813,6 +813,12 @@ class TreeViewWithDnD( QW.QTreeView ):
         
         self.customContextMenuRequested.connect( self._ShowContextMenu )
         
+        self.setDragEnabled( True )
+        self.setAcceptDrops( True )
+        self.setDropIndicatorShown( True )
+        self.setDragDropMode( QW.QAbstractItemView.DragDropMode.InternalMove )
+        self.setDefaultDropAction( QC.Qt.DropAction.MoveAction )
+        
         self.activated.connect( self._OnTreeActivated )
         self.doubleClicked.connect( self._OnTreeActivated )
         
