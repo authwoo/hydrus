@@ -357,9 +357,13 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'import_options_simple_mode' : True,
             'qt_media_player_null_audio_on_silent_media' : False,
             'mpv_null_audio_on_silent_media' : False,
+            'media_effects_enabled_slideshow' : False,
+            'media_effects_enabled_regular' : False,
+            'media_effects_edge_lighting' : False,
             'tab_tree_view_hides_tabs' : False,
             'tab_tree_view_controls_at_top' : False,
-            'tab_tree_view_expanding_panel_at_top' : False
+            'tab_tree_view_expanding_panel_at_top' : False,
+            'tab_tree_sidebar_can_collapse' : False,
         }
         
         #
@@ -646,6 +650,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'command_palette_limit_history_results' : 10,
             'command_palette_limit_favourite_searches_results' : None,
             'tab_tree_view_alignment' : None,
+            'tag_view_alignment' : None,
         }
         
         #
