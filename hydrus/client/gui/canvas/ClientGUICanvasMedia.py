@@ -29,6 +29,7 @@ from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.canvas import ClientGUIMPV
 from hydrus.client.gui.canvas import ClientGUIQtMediaPlayer
 from hydrus.client.gui.canvas import ClientGUITransparency
+from hydrus.client.gui.canvas import ClientGUICanvasMediaEffects
 from hydrus.client.gui.media import ClientGUIMediaControls
 from hydrus.client.media import ClientMedia
 from hydrus.client.media import ClientMediaResult
@@ -1570,53 +1571,13 @@ class MediaContainer( QW.QWidget ):
         
         if hasattr( self, '_edge_lighting' ):
             
-            print('hiding edge lighting')
             self._edge_lighting.hide()
             
         
     
     def _ApplySlideshowTransition( self, old_media, new_media, old_pixmap ):
             
-            slide_dirs = ( 'left', 'right', 'up', 'down' )
-            diag_dirs  = ( 'tl', 'tr', 'bl', 'br' )
-            
-            transition_fns = {
-                CC.MEDIA_TRANSITION_EFFECT_FADE: lambda: self._TransitionFade(),
-                CC.MEDIA_TRANSITION_EFFECT_CROSSFADE: lambda: self._TransitionFadeFromOld( old_pixmap ),
-                
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_LEFT: lambda: self._TransitionSlideFromOld( old_pixmap, 'left' ),
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_RIGHT: lambda: self._TransitionSlideFromOld( old_pixmap, 'right' ),
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_UP: lambda: self._TransitionSlideFromOld( old_pixmap, 'up' ),
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_DOWN: lambda: self._TransitionSlideFromOld( old_pixmap, 'down' ),
-                
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_TL: lambda: self._TransitionSlideDiagonalFromOld( old_pixmap, 'tl' ),
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_TR: lambda: self._TransitionSlideDiagonalFromOld( old_pixmap, 'tr' ),
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_BL: lambda: self._TransitionSlideDiagonalFromOld( old_pixmap, 'bl' ),
-                CC.MEDIA_TRANSITION_EFFECT_SLIDE_BR: lambda: self._TransitionSlideDiagonalFromOld( old_pixmap, 'br' ),
-                
-                CC.MEDIA_TRANSITION_EFFECT_ZOOM_IN: lambda: self._TransitionZoomInFromOld( old_pixmap ),
-                CC.MEDIA_TRANSITION_EFFECT_ZOOM_OUT: lambda: self._TransitionZoomOutFromOld( old_pixmap ),
-                
-                CC.MEDIA_TRANSITION_EFFECT_RANDOM_SLIDE: lambda: self._TransitionSlideFromOld(
-                    old_pixmap,
-                    random.choice( slide_dirs )
-                ),
-                
-                CC.MEDIA_TRANSITION_EFFECT_RAND_DIAG_SLIDE: lambda: self._TransitionSlideDiagonalFromOld(
-                    old_pixmap,
-                    random.choice( diag_dirs )
-                ),
-                
-                CC.MEDIA_TRANSITION_EFFECT_RAND_CROSS_SLIDE: lambda: random.choice( (
-                    lambda: self._TransitionSlideFromOld( old_pixmap, random.choice( slide_dirs ) ),
-                    lambda: self._TransitionSlideDiagonalFromOld( old_pixmap, random.choice( diag_dirs ) )
-                ) )(),
-                
-                CC.MEDIA_TRANSITION_EFFECT_RANDOM_ZOOM: lambda: random.choice( (
-                    lambda: self._TransitionZoomInFromOld( old_pixmap ),
-                    lambda: self._TransitionZoomOutFromOld( old_pixmap )
-                ) )(),
-            }
+            transition_fns = ClientGUICanvasMediaEffects.GetEffectFunctions()
             
             transition = CG.client_controller.new_options.GetNoneableInteger( 'media_transition_effect' )
             
@@ -1635,203 +1596,12 @@ class MediaContainer( QW.QWidget ):
                 
             if transition_fn is not None:
                 
-                transition_fn()
+                transition_fn( self, old_pixmap )
                 
             
         
-    def _TransitionFade( self ):
-        
-        effect = QW.QGraphicsOpacityEffect( self )
-        
-        self.setGraphicsEffect( effect )
-        overlay = QW.QLabel( self )
-        anim = QC.QPropertyAnimation( effect, b'opacity', self )
-        
-        anim.setDuration( 999 )
-        anim.setStartValue( 0.0 )
-        anim.setEndValue( 1.0 )
-        anim.start( QC.QAbstractAnimation.DeletionPolicy.DeleteWhenStopped )
-        
-        overlay._fade_anchor = anim
-        
-    def _TransitionFadeFromOld( self, old_pixmap ):
-        
-        if old_pixmap is None:
-            
-            return
-            
-        
-        overlay = QW.QLabel( self )
-        
-        overlay.setPixmap( old_pixmap )
-        overlay.setScaledContents( False )
-        overlay.setGeometry( self.rect() )
-        overlay.show()
-        
-        effect = QW.QGraphicsOpacityEffect( overlay )
-        overlay.setGraphicsEffect( effect )
-        
-        anim = QC.QPropertyAnimation( effect, b'opacity', overlay )
-        
-        anim.setDuration( 999 )
-        anim.setStartValue( 1.0 )
-        anim.setEndValue( 0.0 )
-        anim.setEasingCurve( QC.QEasingCurve.Type.OutCubic )
-        
-        anim.finished.connect( overlay.deleteLater )
-        
-        anim.start( QC.QAbstractAnimation.DeletionPolicy.DeleteWhenStopped )
-        
-        overlay._anim_anchor = anim
-        
     
-    def _TransitionSlideFromOld( self, old_pixmap, direction = 'left' ):
-        
-        if old_pixmap is None or old_pixmap.isNull():
-            
-            return
-            
-        overlay = QW.QLabel( self )
-        
-        overlay.setPixmap( old_pixmap )
-        overlay.setGeometry( self.rect() )
-        overlay.raise_()
-        overlay.show()
-        
-        start_pos = overlay.pos()
-        
-        if direction == 'left':
-            
-            end_pos = start_pos - QC.QPoint( overlay.width(), 0 )
-            
-        elif direction == 'right':
-            
-            end_pos = start_pos + QC.QPoint( overlay.width(), 0 )
-            
-        elif direction == 'up':
-            
-            end_pos = start_pos - QC.QPoint( 0, overlay.height() )
-            
-        elif direction == 'down':
-            
-            end_pos = start_pos + QC.QPoint( 0, overlay.height() )
-            
-        else:
-            
-            return
-            
-        anim = QC.QPropertyAnimation( overlay, b'pos', overlay )
-        
-        anim.setDuration( 300 )
-        anim.setStartValue( start_pos )
-        anim.setEndValue( end_pos )
-        anim.setEasingCurve( QC.QEasingCurve.Type.OutCubic )
-        
-        anim.finished.connect( overlay.deleteLater )
-        
-        overlay._slide_anim = anim
-        
-        anim.start()
-        
-    
-    def _TransitionZoomInFromOld( self, old_pixmap ):
-        
-        if old_pixmap is None or old_pixmap.isNull():
-            return
-            
-        overlay = QW.QLabel( self )
-        overlay.setPixmap( old_pixmap )
-        overlay.setGeometry( self.rect() )
-        overlay.raise_()
-        overlay.show()
-        
-        start_rect = overlay.geometry()
-        end_rect = start_rect.adjusted(
-            -start_rect.width()  * 0.25,
-            -start_rect.height() * 0.25,
-            start_rect.width()  * 0.25,
-            start_rect.height() * 0.25
-        )
-        
-        anim = QC.QPropertyAnimation( overlay, b'geometry', overlay )
-        anim.setDuration( 300 )
-        anim.setStartValue( start_rect )
-        anim.setEndValue( end_rect )
-        anim.setEasingCurve( QC.QEasingCurve.Type.OutCubic )
-        
-        anim.finished.connect( overlay.deleteLater )
-        overlay._zoom_anim = anim
-        anim.start()
 
-    
-    def _TransitionZoomOutFromOld( self, old_pixmap ):
-        
-        if old_pixmap is None or old_pixmap.isNull():
-            return
-            
-        overlay = QW.QLabel( self )
-        overlay.setPixmap( old_pixmap )
-        overlay.setGeometry( self.rect() )
-        overlay.raise_()
-        overlay.show()
-        
-        start_rect = overlay.geometry()
-        end_rect = start_rect.adjusted(
-            start_rect.width()  * 0.25,
-            start_rect.height() * 0.25,
-            -start_rect.width()  * 0.25,
-            -start_rect.height() * 0.25
-        )
-        
-        anim = QC.QPropertyAnimation( overlay, b'geometry', overlay )
-        anim.setDuration( 300 )
-        anim.setStartValue( start_rect )
-        anim.setEndValue( end_rect )
-        anim.setEasingCurve( QC.QEasingCurve.Type.OutCubic )
-        
-        anim.finished.connect( overlay.deleteLater )
-        overlay._zoom_anim = anim
-        anim.start()
-        
-    
-    def _TransitionSlideDiagonalFromOld( self, old_pixmap, corner ):
-        
-        if old_pixmap is None or old_pixmap.isNull():
-            return
-            
-        overlay = QW.QLabel( self )
-        overlay.setPixmap( old_pixmap )
-        overlay.setGeometry( self.rect() )
-        overlay.raise_()
-        overlay.show()
-        
-        start_pos = overlay.pos()
-        
-        dx = overlay.width()
-        dy = overlay.height()
-        
-        offsets = {
-            'tl' : QC.QPoint( -dx, -dy ),
-            'tr' : QC.QPoint(  dx, -dy ),
-            'bl' : QC.QPoint( -dx,  dy ),
-            'br' : QC.QPoint(  dx,  dy ),
-        }
-        
-        offset = offsets.get( corner )
-        if offset is None:
-            return
-            
-        anim = QC.QPropertyAnimation( overlay, b'pos', overlay )
-        anim.setDuration( 350 )
-        anim.setStartValue( start_pos )
-        anim.setEndValue( start_pos + offset )
-        anim.setEasingCurve( QC.QEasingCurve.Type.OutCubic )
-        
-        anim.finished.connect( overlay.deleteLater )
-        overlay._diag_anim = anim
-        anim.start()
-        
-    
     def _GrabCurrentMediaPixmap( self ):
         
         if self._media_window is None:
@@ -1839,49 +1609,6 @@ class MediaContainer( QW.QWidget ):
             return None
             
         return self._media_window.grab()
-
-    def _TransitionSlide( self, direction ):
-        
-        start_pos = self.pos()
-        
-        offset = QC.QPoint( self.width(), 0 )
-        
-        if direction == 'left':
-            
-            offset = -offset
-            
-        self.move( start_pos + offset )
-        
-        anim = QC.QPropertyAnimation( self, b'pos', self )
-        
-        anim.setDuration( 300 )
-        anim.setStartValue( self.pos() )
-        anim.setEndValue( start_pos )
-        anim.setEasingCurve( QC.QEasingCurve.Type.OutCubic )
-        
-        anim.start( QC.QAbstractAnimation.DeletionPolicy.DeleteWhenStopped )
-        
-
-    def _TransitionCrossFade( self, old_pixmap ):
-        
-        overlay = QW.QLabel( self )
-        overlay.setPixmap( old_pixmap )
-        overlay.setGeometry( self.rect() )
-        overlay.show()
-        
-        effect = QW.QGraphicsOpacityEffect( overlay )
-        overlay.setGraphicsEffect( effect )
-        
-        anim = QC.QPropertyAnimation( effect, b'opacity', overlay )
-        
-        anim.setDuration( 300 )
-        anim.setStartValue( 1.0 )
-        anim.setEndValue( 0.0 )
-        
-        anim.finished.connect( overlay.deleteLater )
-        
-        anim.start( QC.QAbstractAnimation.DeletionPolicy.DeleteWhenStopped )
-        
 
     def _DestroyOrHideThisMediaWindow( self, media_window ):
         
@@ -2931,18 +2658,9 @@ class MediaContainer( QW.QWidget ):
         
         if self._media_window is not None:
             
-            if CG.client_controller.new_options.GetBoolean( 'media_effects_enabled_regular' ) or CG.client_controller.new_options.GetBoolean( 'media_effects_enabled_slideshow' ):
+            if  self._canvas_type in CC.CANVAS_MEDIA_VIEWER_TYPES and ( CG.client_controller.new_options.GetBoolean( 'media_effects_enabled_regular' ) or CG.client_controller.new_options.GetBoolean( 'media_effects_enabled_slideshow' ) ):
                 
                 self._ApplySlideshowTransition( previous_media, self._media, old_media_pixmap )
-                
-            
-            if CG.client_controller.new_options.GetBoolean( 'media_effects_edge_lighting' ):
-                
-                self._ApplyEdgeLighting()
-                
-            else:
-                
-                self._DisableEdgeLighting()
                 
             
             self._media_window.show()

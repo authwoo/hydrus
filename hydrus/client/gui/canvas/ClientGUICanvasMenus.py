@@ -64,7 +64,7 @@ def AppendSlideshowMenu( win: CAC.ApplicationCommandProcessorMixin, menu: QW.QMe
     effect_submenu = ClientGUIMenus.GenerateMenu( slideshow_menu )
     
     ClientGUIMenus.AppendMenuCheckItem( effect_submenu, 'apply in slideshows', 'If checked, media transition effects will be applied during slideshows.', CG.client_controller.new_options.GetBoolean( 'media_effects_enabled_slideshow' ), CG.client_controller.new_options.FlipBoolean, 'media_effects_enabled_slideshow' )
-    ClientGUIMenus.AppendMenuCheckItem( effect_submenu, 'apply regularly', 'If checked, media transition effects will be applied when you change displayed media.', CG.client_controller.new_options.GetBoolean( 'media_effects_enabled_regular' ), CG.client_controller.new_options.FlipBoolean, 'media_effects_enabled_regular' )
+    ClientGUIMenus.AppendMenuCheckItem( effect_submenu, 'apply when you navigate', 'If checked, media transition effects will be applied when you change displayed media.', CG.client_controller.new_options.GetBoolean( 'media_effects_enabled_regular' ), CG.client_controller.new_options.FlipBoolean, 'media_effects_enabled_regular' )
     
     ClientGUIMenus.AppendSeparator( effect_submenu )
     
@@ -73,5 +73,6 @@ def AppendSlideshowMenu( win: CAC.ApplicationCommandProcessorMixin, menu: QW.QMe
         ClientGUIMenus.AppendMenuCheckItem( effect_submenu, effect_str, f'Set the media transition effect to {effect_str}.', CG.client_controller.new_options.GetNoneableInteger( 'media_transition_effect' ) == effect, CG.client_controller.new_options.SetNoneableInteger, 'media_transition_effect', effect )
         
     
-    ClientGUIMenus.AppendMenu( slideshow_menu, effect_submenu, 'effects' )
+    ClientGUIMenus.AppendMenu( slideshow_menu, effect_submenu, 'EXPERIMENTAL: effects' )
+    
     
