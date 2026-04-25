@@ -556,14 +556,19 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         self._notebook = ClientGUIPages.PagesNotebook( self, 'top page notebook' )
         
         self._tabs_tree_view = QP.TreeViewWithDnD( self )
-        self._tabs_tree_model = ClientGUIPagesTreeModel.PagesNotebookTreeModel( self._notebook, self )
+        self._tabs_tree_model = ClientGUIPagesTreeModel.PagesNotebookTreeModel( self._notebook, self._tabs_tree_view )
         self._tabs_tree_view.setModel( self._tabs_tree_model )
         self._tabs_tree_sidebar = QP.TreeViewWithControls( self._tabs_tree_view, self )
         
-        self._notebook.dataChanged.connect( self._tabs_tree_model.Update )
-        self._notebook.dataChanged.connect( lambda: self._controller.CallLaterQtSafe( self, 0.5, 'expand treeview', self._tabs_tree_view.expandToDepth, 2 ) )
-        
         self._tabs_tree_sidebar.widgetAlignmentChanged.connect( self._RebuildMainFrameLayout )
+        self._tabs_tree_sidebar.tagBarAlignmentChanged.connect( self._notebook.RebuildManagementMediaLayout )
+        self._tabs_tree_sidebar.tabBarVisibilityChanged.connect( self._notebook.UpdateTabVisibility )
+        self._tabs_tree_sidebar.treeSidebarCollapsibilityChanged.connect( self._UpdateTreeSidebarCollapsibility )
+        
+        self._tabs_tree_model.modelAboutToBeReset.connect( self._tabs_tree_view.SaveState )
+        self._tabs_tree_model.modelReset.connect( self._tabs_tree_view.RestoreState )
+        
+        self._notebook.selectionChanged.connect( self._tabs_tree_view.SelectLeafFromNotebookPage )
         
         self._page_nav_history = ClientGUIPages.PagesHistory()
         
@@ -4202,10 +4207,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 
                 self._BootOrStopClipboardWatcherIfNeeded()
                 
-                self._controller.CallLaterQtSafe( self, 0.5, 'expand treeview', self._tabs_tree_view.expandToDepth, 2 )
-                #expanded = self._tabs_tree_view._GetExpandedPageKeys()
-                self._tabs_tree_model.Update()
-                #self._tabs_tree_view._RestoreExpandedPageKeys( expanded )
+                self._tabs_tree_model.Reset()
                 
             
         
@@ -5465,25 +5467,35 @@ ATTACH "client.mappings.db" as external_mappings;'''
         else:
             
             if alignment == CC.DIRECTION_LEFT:
-                
-                sizes = CG.client_controller.new_options.GetIntegerList( 'tab_tree_splitter_sizes_left' )
+                                
                 self._vertical_splitter.addWidget( self._tabs_tree_sidebar )
                 self._vertical_splitter.addWidget( self._notebook )
+                
+                sizes = CG.client_controller.new_options.GetIntegerList( 'tab_tree_splitter_sizes_left' )
+                self._vertical_splitter.widget( 0 ).setMinimumWidth( 100 )
                 self._vertical_splitter.setSizes( sizes )
+                
+                self._vertical_splitter.setCollapsible( 0, CG.client_controller.new_options.GetBoolean( 'tab_tree_sidebar_can_collapse' ) )
                 self._vertical_splitter.setCollapsible( 1, False )
+                
                 
             else:
                 
-                sizes = CG.client_controller.new_options.GetIntegerList( 'tab_tree_splitter_sizes_right' )
                 self._vertical_splitter.addWidget( self._notebook )
                 self._vertical_splitter.addWidget( self._tabs_tree_sidebar )
+                
+                sizes = CG.client_controller.new_options.GetIntegerList( 'tab_tree_splitter_sizes_right' )
+                self._vertical_splitter.widget( 1 ).setMinimumWidth( 100 )
                 self._vertical_splitter.setSizes( sizes )
+                
                 self._vertical_splitter.setCollapsible( 0, False )
+                self._vertical_splitter.setCollapsible( 1, CG.client_controller.new_options.GetBoolean( 'tab_tree_sidebar_can_collapse' ) )
+            
             
             self._vertical_splitter.setStretchFactor( 0, 0 )
             self._vertical_splitter.setStretchFactor( 1, 1 )
             
-            self._controller.CallLaterQtSafe( self, 0.5, 'expand treeview', self._tabs_tree_sidebar.expandToDepth, 2 )
+            self._controller.CallLaterQtSafe( self, 0.05, 'expand treeview', self._tabs_tree_sidebar.expandToDepth, 2 )
             
         
     
@@ -7326,7 +7338,21 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
         
     
-    
+    def _UpdateTreeSidebarCollapsibility( self ):
+        
+        update = CG.client_controller.new_options.GetBoolean( 'tab_tree_sidebar_can_collapse' )
+        
+        if CG.client_controller.new_options.GetNoneableInteger( 'tab_tree_view_alignment' ) == CC.DIRECTION_LEFT:
+            
+            self._vertical_splitter.setCollapsible( 0, update )
+            
+        else:
+            
+            self._vertical_splitter.setCollapsible( 1, update )
+        
+            
+        
+        
     def _UpdateSystemTrayIcon( self, currently_booting = False ):
         
         if not ClientGUISystemTray.SystemTrayAvailable() or ( not (HC.PLATFORM_WINDOWS or HC.PLATFORM_MACOS ) and not CG.client_controller.new_options.GetBoolean( 'advanced_mode' ) ):
@@ -8212,12 +8238,6 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         
         self._menu_updater_pages.update()
         self._menu_updater_undo.update()
-        
-        self._controller.CallLaterQtSafe( self, 0.5, 'expand treeview', self._tabs_tree_view.expandToDepth, 2 )
-        #expanded = self._tabs_tree_view._GetExpandedPageKeys()
-        self._tabs_tree_model.Update()
-        #self._tabs_tree_view._RestoreExpandedPageKeys( expanded )
-        
         
     
     def NotifyDeletedPage( self, page ):

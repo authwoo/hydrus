@@ -103,7 +103,7 @@ class GUIPagesPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
             
         
         self._tab_tree_view_hides_tabs = QW.QCheckBox( self._navigation_and_dnd )
-        self._tab_tree_view_hides_tabs.setToolTip( ClientGUIFunctions.WrapToolTip( 'If you have the tab tree view enabled, hiding the main tabs can save space and reduce visual clutter.' ) )
+        self._tab_tree_view_hides_tabs.setToolTip( ClientGUIFunctions.WrapToolTip( 'If you have the tab tree view enabled, hiding the main tabs can save space and reduce visual clutter. This checkbox is ignored if you disable the treeview.' ) )
         
         #
         
