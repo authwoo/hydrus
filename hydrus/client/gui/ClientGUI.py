@@ -558,7 +558,7 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         self._tabs_tree_view = QP.TreeViewWithDnD( self )
         self._tabs_tree_model = ClientGUIPagesTreeModel.PagesNotebookTreeModel( self._notebook, self._tabs_tree_view )
         self._tabs_tree_view.setModel( self._tabs_tree_model )
-        self._tabs_tree_sidebar = QP.TreeViewWithControls( self._tabs_tree_view, self )
+        self._tabs_tree_sidebar = QP.TreeViewWithControls( self._tabs_tree_view )
         
         self._tabs_tree_sidebar.widgetAlignmentChanged.connect( self._RebuildMainFrameLayout )
         self._tabs_tree_sidebar.tagBarAlignmentChanged.connect( self._notebook.RebuildManagementMediaLayout )
@@ -5467,7 +5467,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         else:
             
             if alignment == CC.DIRECTION_LEFT:
-                                
+                
                 self._vertical_splitter.addWidget( self._tabs_tree_sidebar )
                 self._vertical_splitter.addWidget( self._notebook )
                 

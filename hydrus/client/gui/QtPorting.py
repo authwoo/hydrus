@@ -1039,7 +1039,6 @@ class TreeViewWithControls( QW.QWidget ):
         self._controls_layout = QW.QHBoxLayout( self._controls )
         self._controls_layout.setContentsMargins( 0, 0, 0, 0 ) 
         self._controls_layout.setSpacing( 2 )
-
         
         self.collapse_all = ClientGUICommon.IconButton( self, CC.global_icons().position_first, lambda: self.expandToDepth( -1 ) )
         self.collapse_all.setToolTip( ClientGUIFunctions.WrapToolTip( 'Collapse all' ) )
@@ -1047,25 +1046,25 @@ class TreeViewWithControls( QW.QWidget ):
         self.depth_decrement = ClientGUICommon.IconButton( self, CC.global_icons().position_previous, lambda: self.expandToDepth( self._current_depth - 1 ) )
         self.depth_decrement.setToolTip( ClientGUIFunctions.WrapToolTip( 'Collapse to one less than last' ) )
         
-        depth_1 = QW.QPushButton( '1', self )
+        depth_1 = QW.QPushButton( '1', self._controls )
         depth_1.clicked.connect( lambda: self.expandToDepth( 0 ) )
         depth_1.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to depth 1' ) )
         
-        depth_2 = QW.QPushButton( '2', self )
+        depth_2 = QW.QPushButton( '2', self._controls )
         depth_2.clicked.connect( lambda: self.expandToDepth( 1 ) )
         depth_2.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to depth 2' ) )
         
-        depth_3 = QW.QPushButton( '3', self )
+        depth_3 = QW.QPushButton( '3', self._controls )
         depth_3.clicked.connect( lambda: self.expandToDepth( 2 ) )
         depth_3.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to depth 3' ) )
         
-        self.depth_increment = ClientGUICommon.IconButton( self, CC.global_icons().position_next, lambda: self.expandToDepth( self._current_depth + 1 ) )
+        self.depth_increment = ClientGUICommon.IconButton( self._controls, CC.global_icons().position_next, lambda: self.expandToDepth( self._current_depth + 1 ) )
         self.depth_increment.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand to one more than last' ) )
         
-        self.expand_all = ClientGUICommon.IconButton( self, CC.global_icons().position_last, lambda: self.expandToDepth( self._tree.model().GetViewDepth() ) )
+        self.expand_all = ClientGUICommon.IconButton( self._controls, CC.global_icons().position_last, lambda: self.expandToDepth( self._tree.model().GetViewDepth() ) )
         self.expand_all.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand all' ) )
         
-        self._controls_button = ClientGUICommon.IconButton( self, CC.global_icons().cog, self._ShowCogMenu )
+        self._controls_button = ClientGUICommon.IconButton( self._controls, CC.global_icons().cog, self._ShowCogMenu )
         self._controls_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Tree view controls' ) )
         
         #

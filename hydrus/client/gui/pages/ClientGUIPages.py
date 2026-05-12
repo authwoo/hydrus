@@ -715,6 +715,11 @@ class Page( QW.QWidget ):
         
         sizes = self._management_media_split.sizes()
         
+        if CG.client_controller.new_options.GetNoneableInteger( 'tag_view_alignment' ) == CC.DIRECTION_RIGHT:
+            
+            sizes.reverse()
+            
+        
         if len( sizes ) > 1:
             
             if sizes[0] != 0:
@@ -3484,6 +3489,8 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
             
             CG.client_controller.CallLaterQtSafe( self, 0.5, 'set page focus', page.SetSearchFocus )
             
+        
+        CG.client_controller.CallLaterQtSafe( self, 0.0, 'rebuild media management layout', page.SetSplitterPositions )
         
         return page
         
